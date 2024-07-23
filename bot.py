@@ -30,11 +30,11 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 STAY_CHANNEL_ID = os.getenv('STAY_CHANNEL_ID')
 MONITOR_CHANNEL_ID = os.getenv('MONITOR_CHANNEL_ID')
 
-# Directly specify the audio file path
-AUDIO_FILE = r'C:\Users\Nasro\Desktop\bot chkon ja\voices\chkon ja.mp3'
+# Define the relative path for the audio file
+AUDIO_FILE = os.path.join(os.path.dirname(__file__), 'voices', 'chkon ja.mp3')
 
 # Set the path to the FFmpeg binary
-FFMPEG_PATH = os.path.abspath('ffmpeg/ffmpeg')
+FFMPEG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'ffmpeg', 'ffmpeg'))
 
 # Debugging: print environment variables
 print(f"TOKEN: {TOKEN}")
