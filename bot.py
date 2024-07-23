@@ -27,8 +27,8 @@ load_dotenv()
 
 # Get environment variables
 TOKEN = os.getenv('DISCORD_TOKEN')
-STAY_CHANNEL_ID = int(os.getenv('STAY_CHANNEL_ID'))
-MONITOR_CHANNEL_ID = int(os.getenv('MONITOR_CHANNEL_ID'))
+STAY_CHANNEL_ID = os.getenv('STAY_CHANNEL_ID')
+MONITOR_CHANNEL_ID = os.getenv('MONITOR_CHANNEL_ID')
 
 # Directly specify the audio file path
 AUDIO_FILE = r'C:\Users\Nasro\Desktop\bot chkon ja\voices\chkon ja.mp3'
@@ -43,6 +43,9 @@ print(f"MONITOR_CHANNEL_ID: {MONITOR_CHANNEL_ID}")
 print(f"AUDIO_FILE: {AUDIO_FILE}")
 print(f"FFMPEG_PATH: {FFMPEG_PATH}")
 
+if TOKEN is None:
+    raise ValueError("DISCORD_TOKEN environment variable not set")
+
 intents = discord.Intents.default()
 intents.voice_states = True
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -50,7 +53,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.event
 async def on_ready():
     print(f'Bot connected as {bot.user}')
-    stay_channel = bot.get_channel(STAY_CHANNEL_ID)
+    stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
     if stay_channel and stay_channel.type == discord.ChannelType.voice:
         await stay_channel.connect()
     else:
@@ -58,7 +61,7 @@ async def on_ready():
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    if after.channel and after.channel.id == MONITOR_CHANNEL_ID and before.channel != after.channel:
+    if after.channel and after.channel.id == int(MONITOR_CHANNEL_ID) and before.channel != after.channel:
         voice_client = discord.utils.get(bot.voice_clients, guild=member.guild)
         if voice_client and voice_client.is_connected():
             voice_client.stop()
