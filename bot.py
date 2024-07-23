@@ -1,9 +1,22 @@
-import discord
+import os
+import subprocess
+import sys
+
+# Print installed packages
+subprocess.check_call([sys.executable, "-m", "pip", "list"])
+
+# Attempt to import discord.py
+try:
+    import discord
+except ImportError:
+    print("discord.py is not installed.")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "discord.py"])
+    import discord
+
 from discord.ext import commands
 import asyncio
 from keep_alive import keep_alive  # Import the keep_alive function
 from dotenv import load_dotenv
-import os
 
 # Load environment variables from .env file
 load_dotenv()
