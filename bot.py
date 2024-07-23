@@ -2,19 +2,21 @@ import os
 import subprocess
 import sys
 
-# Print installed packages
-subprocess.check_call([sys.executable, "-m", "pip", "list"])
+# Ensure all necessary packages are installed
+required_modules = ["discord.py", "flask", "python-dotenv", "pynacl", "typing_extensions"]
 
-# Attempt to import necessary modules and install if missing
-modules = ['discord', 'flask', 'dotenv', 'pynacl', 'typing_extensions']
-for module in modules:
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+for package in required_modules:
     try:
-        __import__(module)
+        __import__(package.split('.')[0])  # Import the base module name
     except ImportError:
-        print(f"{module} is not installed. Installing now...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", module])
-        __import__(module)
+        print(f"{package} is not installed. Installing now...")
+        install(package)
 
+# Now import all necessary modules
+import discord
 from discord.ext import commands
 import asyncio
 from keep_alive import keep_alive  # Import the keep_alive function
