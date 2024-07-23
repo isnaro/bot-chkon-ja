@@ -1,6 +1,11 @@
 import os
 import subprocess
 import sys
+import discord
+from discord.ext import commands
+import asyncio
+from keep_alive import keep_alive  # Import the keep_alive function
+from dotenv import load_dotenv
 
 # Ensure all necessary packages are installed
 required_modules = ["discord.py", "flask", "python-dotenv", "pynacl", "typing_extensions"]
@@ -14,13 +19,6 @@ for package in required_modules:
     except ImportError:
         print(f"{package} is not installed. Installing now...")
         install(package)
-
-# Now import all necessary modules
-import discord
-from discord.ext import commands
-import asyncio
-from keep_alive import keep_alive  # Import the keep_alive function
-from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -53,9 +51,15 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.event
 async def on_ready():
     print(f'Bot connected as {bot.user}')
+    await connect_to_stay_channel()
+
+async def connect_to_stay_channel():
     stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
     if stay_channel and stay_channel.type == discord.ChannelType.voice:
-        await stay_channel.connect()
+        voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
+        if voice_client is None or not voice_client.is_connected():
+            await stay_channel.connect()
+            print(f'Connected to stay channel: {stay_channel.name}')
     else:
         print(f'Error: Could not connect to stay channel (ID: {STAY_CHANNEL_ID})')
 
@@ -67,6 +71,11 @@ async def on_voice_state_update(member, before, after):
             voice_client.stop()
             source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH)
             voice_client.play(source)
+
+@bot.event
+async def on_disconnect():
+    print('Bot disconnected, attempting to reconnect...')
+    await connect_to_stay_channel()
 
 # Keep the bot alive
 keep_alive()
