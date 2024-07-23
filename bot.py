@@ -48,10 +48,21 @@ intents = discord.Intents.default()
 intents.voice_states = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+async def ensure_unmuted():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
+        if stay_channel and stay_channel.type == discord.ChannelType.voice:
+            voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
+            if voice_client and voice_client.is_connected():
+                await voice_client.guild.change_voice_state(channel=voice_client.channel, self_mute=False, self_deaf=False)
+        await asyncio.sleep(5)
+
 @bot.event
 async def on_ready():
     print(f'Bot connected as {bot.user}')
     await connect_to_stay_channel()
+    bot.loop.create_task(ensure_unmuted())
 
 async def connect_to_stay_channel():
     stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
@@ -71,6 +82,10 @@ async def on_voice_state_update(member, before, after):
             voice_client.stop()
             source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH)
             voice_client.play(source)
+
+    # Ensure the bot is unmuted if it's muted
+    if member.id == bot.user.id and (after.self_mute or after.self_deaf):
+        await member.guild.change_voice_state(channel=after.channel, self_mute=False, self_deaf=False)
 
 @bot.event
 async def on_disconnect():
