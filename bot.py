@@ -61,8 +61,8 @@ async def ensure_unmuted():
 @bot.event
 async def on_ready():
     print(f'Bot connected as {bot.user}')
-    await connect_to_stay_channel()
     bot.loop.create_task(ensure_unmuted())
+    await connect_to_stay_channel()
 
 async def connect_to_stay_channel():
     stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
@@ -86,6 +86,12 @@ async def on_voice_state_update(member, before, after):
     # Ensure the bot is unmuted if it's muted
     if member.id == bot.user.id and (after.self_mute or after.self_deaf):
         await member.guild.change_voice_state(channel=after.channel, self_mute=False, self_deaf=False)
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    # Reconnect if bot is kicked from the channel
+    if member.id == bot.user.id and before.channel is not None and after.channel is None:
+        await connect_to_stay_channel()
 
 @bot.event
 async def on_disconnect():
