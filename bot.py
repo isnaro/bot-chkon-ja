@@ -70,7 +70,7 @@ async def ensure_unmuted():
             voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
             if voice_client and voice_client.is_connected():
                 await voice_client.guild.change_voice_state(channel=voice_client.channel, self_mute=False, self_deaf=False)
-                await bot.user.edit(mute=False, deafen=False)
+                await bot.get_guild(stay_channel.guild.id).me.edit(mute=False, deafen=False)
         await asyncio.sleep(5)
 
 @bot.event
