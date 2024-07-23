@@ -48,6 +48,20 @@ intents = discord.Intents.default()
 intents.voice_states = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+async def ensure_connected():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
+        if stay_channel and stay_channel.type == discord.ChannelType.voice:
+            voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
+            if voice_client is None or not voice_client.is_connected():
+                try:
+                    await stay_channel.connect()
+                    print(f'Connected to stay channel: {stay_channel.name}')
+                except Exception as e:
+                    print(f'Error connecting to stay channel: {e}')
+        await asyncio.sleep(5)
+
 async def ensure_unmuted():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -56,23 +70,14 @@ async def ensure_unmuted():
             voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
             if voice_client and voice_client.is_connected():
                 await voice_client.guild.change_voice_state(channel=voice_client.channel, self_mute=False, self_deaf=False)
+                await bot.user.edit(mute=False, deafen=False)
         await asyncio.sleep(5)
 
 @bot.event
 async def on_ready():
     print(f'Bot connected as {bot.user}')
+    bot.loop.create_task(ensure_connected())
     bot.loop.create_task(ensure_unmuted())
-    await connect_to_stay_channel()
-
-async def connect_to_stay_channel():
-    stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
-    if stay_channel and stay_channel.type == discord.ChannelType.voice:
-        voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
-        if voice_client is None or not voice_client.is_connected():
-            await stay_channel.connect()
-            print(f'Connected to stay channel: {stay_channel.name}')
-    else:
-        print(f'Error: Could not connect to stay channel (ID: {STAY_CHANNEL_ID})')
 
 @bot.event
 async def on_voice_state_update(member, before, after):
@@ -92,7 +97,7 @@ async def on_voice_state_update(member, before, after):
 @bot.event
 async def on_disconnect():
     print('Bot disconnected, attempting to reconnect...')
-    await connect_to_stay_channel()
+    bot.loop.create_task(ensure_connected())
 
 # Keep the bot alive
 keep_alive()
