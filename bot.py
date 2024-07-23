@@ -33,11 +33,15 @@ MONITOR_CHANNEL_ID = int(os.getenv('MONITOR_CHANNEL_ID'))
 # Directly specify the audio file path
 AUDIO_FILE = r'C:\Users\Nasro\Desktop\bot chkon ja\voices\chkon ja.mp3'
 
+# Set the path to the FFmpeg binary
+FFMPEG_PATH = os.path.abspath('ffmpeg/ffmpeg')
+
 # Debugging: print environment variables
 print(f"TOKEN: {TOKEN}")
 print(f"STAY_CHANNEL_ID: {STAY_CHANNEL_ID}")
 print(f"MONITOR_CHANNEL_ID: {MONITOR_CHANNEL_ID}")
 print(f"AUDIO_FILE: {AUDIO_FILE}")
+print(f"FFMPEG_PATH: {FFMPEG_PATH}")
 
 intents = discord.Intents.default()
 intents.voice_states = True
@@ -58,7 +62,7 @@ async def on_voice_state_update(member, before, after):
         voice_client = discord.utils.get(bot.voice_clients, guild=member.guild)
         if voice_client and voice_client.is_connected():
             voice_client.stop()
-            source = discord.FFmpegPCMAudio(AUDIO_FILE)
+            source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH)
             voice_client.play(source)
 
 # Keep the bot alive
