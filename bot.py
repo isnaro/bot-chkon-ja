@@ -5,13 +5,15 @@ import sys
 # Print installed packages
 subprocess.check_call([sys.executable, "-m", "pip", "list"])
 
-# Attempt to import discord.py
-try:
-    import discord
-except ImportError:
-    print("discord.py is not installed.")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "discord.py"])
-    import discord
+# Attempt to import necessary modules and install if missing
+modules = ['discord', 'flask', 'dotenv', 'pynacl', 'typing_extensions']
+for module in modules:
+    try:
+        __import__(module)
+    except ImportError:
+        print(f"{module} is not installed. Installing now...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", module])
+        __import__(module)
 
 from discord.ext import commands
 import asyncio
