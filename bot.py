@@ -28,6 +28,7 @@ load_dotenv()
 
 # Retrieve environment variables from .env
 TOKEN = os.getenv('DISCORD_TOKEN')
+# The following are still loaded, but not used in this version.
 STAY_CHANNEL_ID = os.getenv('STAY_CHANNEL_ID')
 MONITOR_CHANNEL_ID = os.getenv('MONITOR_CHANNEL_ID')
 
@@ -36,110 +37,25 @@ CHAT_CHANNEL_ID = 1335564442691440691
 
 # Debugging: print environment variables (optional)
 print(f"TOKEN: {TOKEN}")
-print(f"STAY_CHANNEL_ID: {STAY_CHANNEL_ID}")
-print(f"MONITOR_CHANNEL_ID: {MONITOR_CHANNEL_ID}")
 print(f"CHAT_CHANNEL_ID: {CHAT_CHANNEL_ID}")
 
 if TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable not set")
 
-# Define the relative path for the audio file (used in voice events)
-AUDIO_FILE = os.path.join(os.path.dirname(__file__), 'voices', 'chkon ja.mp3')
-
-# Set the path to the FFmpeg binary
-FFMPEG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'ffmpeg', 'ffmpeg'))
-print(f"AUDIO_FILE: {AUDIO_FILE}")
-print(f"FFMPEG_PATH: {FFMPEG_PATH}")
-
-# DeepSeek API configuration
+# DeepSeek API configuration (per the docs)
 DEEPSEEK_API_KEY = "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"
-DEEPSEEK_API_ENDPOINT = "https://api.deepseek.com/chat/completions"  # Official endpoint
+DEEPSEEK_API_ENDPOINT = "https://api.deepseek.com/chat/completions"  # Official endpoint per docs
 
-# Define intents including message content so the bot can read incoming messages
+# Define intents so the bot can read incoming messages
 intents = discord.Intents.default()
-intents.voice_states = True
 intents.messages = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-async def ensure_connected():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
-        # Check that the channel exists and is a voice channel
-        if stay_channel and stay_channel.type == discord.ChannelType.voice:
-            voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
-            if voice_client is None:
-                try:
-                    await stay_channel.connect()
-                    print(f"Connected to stay channel: {stay_channel.name}")
-                except Exception as e:
-                    if "Already connected" in str(e):
-                        pass
-                    else:
-                        print(f"Error connecting to stay channel: {e}")
-            else:
-                if not voice_client.is_connected():
-                    try:
-                        await stay_channel.connect()
-                        print(f"Connected to stay channel: {stay_channel.name}")
-                    except Exception as e:
-                        if "Already connected" in str(e):
-                            pass
-                        else:
-                            print(f"Error connecting to stay channel: {e}")
-        await asyncio.sleep(5)
-
-async def ensure_unmuted():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        stay_channel = bot.get_channel(int(STAY_CHANNEL_ID))
-        if stay_channel and stay_channel.type == discord.ChannelType.voice:
-            voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
-            if voice_client and voice_client.is_connected():
-                try:
-                    await voice_client.guild.change_voice_state(
-                        channel=voice_client.channel, self_mute=False, self_deaf=False
-                    )
-                    await bot.get_guild(stay_channel.guild.id).me.edit(mute=False, deafen=False)
-                except Exception as e:
-                    print(f"Error ensuring bot unmuted: {e}")
-        await asyncio.sleep(5)
-
 @bot.event
 async def on_ready():
     print(f"Bot connected as {bot.user}")
-    bot.loop.create_task(ensure_connected())
-    bot.loop.create_task(ensure_unmuted())
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    # Automatically unmute the specific user when they are server muted
-    target_user_id = 387923086730723329  # The user ID to auto-unmute
-    if member.id == target_user_id and after.mute:
-        try:
-            await member.edit(mute=False)
-            print(f"Automatically unmuted {member.display_name}.")
-        except Exception as e:
-            print(f"Failed to unmute {member.display_name}: {e}")
-
-    # Play a sound when someone joins the monitor channel
-    if after.channel and after.channel.id == int(MONITOR_CHANNEL_ID) and before.channel != after.channel:
-        voice_client = discord.utils.get(bot.voice_clients, guild=member.guild)
-        if voice_client and voice_client.is_connected():
-            voice_client.stop()  # Stop any current audio before playing the new sound
-            source = discord.FFmpegPCMAudio(AUDIO_FILE, executable=FFMPEG_PATH)
-            voice_client.play(source)
-
-    # Ensure the bot remains unmuted if it accidentally gets muted
-    if member.id == bot.user.id:
-        if after.self_mute or after.self_deaf or after.mute or after.deaf:
-            try:
-                await member.guild.change_voice_state(channel=after.channel, self_mute=False, self_deaf=False)
-                await member.edit(mute=False, deafen=False)
-            except Exception as e:
-                print(f"Error ensuring bot unmuted: {e}")
 
 @bot.event
 async def on_message(message):
@@ -154,21 +70,22 @@ async def on_message(message):
                 "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json"
             }
-            # Prepare payload with a system message and the user's message
+            # Prepare payload according to DeepSeek API docs
             payload = {
-                "model": "deepseek-reasoner",  # DeepSeek-R1 (reasoner model)
+                "model": "deepseek-reasoner",  # Change to "deepseek-chat" if desired
                 "messages": [
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": message.content}
                 ],
-                "max_tokens": 150,  # Adjust as needed for your use-case
-                "temperature": 0.6
+                "max_tokens": 150,      # Adjust as needed
+                "temperature": 0.6,     # Adjust as needed
+                "stream": False         # Non-streaming mode as per the docs
             }
             try:
                 async with session.post(DEEPSEEK_API_ENDPOINT, headers=headers, json=payload) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        # Assuming the API returns generated text in the first choice's message field
+                        # Assuming the API returns generated text in the first choice's message
                         reply = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                         if reply:
                             await message.channel.send(reply)
@@ -181,13 +98,12 @@ async def on_message(message):
                 print(f"Error calling DeepSeek API: {e}")
                 await message.channel.send("Sorry, there was an error connecting to the DeepSeek API.")
 
-    # Allow command processing
+    # Allow command processing if there are any commands
     await bot.process_commands(message)
 
 @bot.event
 async def on_disconnect():
-    print("Bot disconnected, attempting to reconnect...")
-    bot.loop.create_task(ensure_connected())
+    print("Bot disconnected.")
 
 # Keep the bot alive (useful for hosting platforms like Replit)
 keep_alive()
