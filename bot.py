@@ -70,12 +70,25 @@ async def ensure_connected():
         # Check that the channel exists and is a voice channel
         if stay_channel and stay_channel.type == discord.ChannelType.voice:
             voice_client = discord.utils.get(bot.voice_clients, guild=stay_channel.guild)
-            if voice_client is None or not voice_client.is_connected():
+            if voice_client is None:
                 try:
                     await stay_channel.connect()
                     print(f"Connected to stay channel: {stay_channel.name}")
                 except Exception as e:
-                    print(f"Error connecting to stay channel: {e}")
+                    if "Already connected" in str(e):
+                        pass
+                    else:
+                        print(f"Error connecting to stay channel: {e}")
+            else:
+                if not voice_client.is_connected():
+                    try:
+                        await stay_channel.connect()
+                        print(f"Connected to stay channel: {stay_channel.name}")
+                    except Exception as e:
+                        if "Already connected" in str(e):
+                            pass
+                        else:
+                            print(f"Error connecting to stay channel: {e}")
         await asyncio.sleep(5)
 
 async def ensure_unmuted():
@@ -155,7 +168,7 @@ async def on_message(message):
                 async with session.post(DEEPSEEK_API_ENDPOINT, headers=headers, json=payload) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        # Assuming the API returns generated text in the first choice's message
+                        # Assuming the API returns generated text in the first choice's message field
                         reply = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                         if reply:
                             await message.channel.send(reply)
