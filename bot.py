@@ -6,9 +6,10 @@ from discord.ext import commands
 import asyncio
 from keep_alive import keep_alive  # Import the keep_alive function
 from dotenv import load_dotenv
+import google.generativeai as genai  # Import the Gemini API library
 
 # Ensure all necessary packages are installed
-required_modules = ["discord.py", "flask", "python-dotenv", "pynacl", "typing_extensions"]
+required_modules = ["discord.py", "flask", "python-dotenv", "pynacl", "typing_extensions", "google-generativeai"]
 
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
@@ -27,12 +28,16 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 STAY_CHANNEL_ID = os.getenv('STAY_CHANNEL_ID')
 MONITOR_CHANNEL_ID = os.getenv('MONITOR_CHANNEL_ID')
+AUDIO_FILE = os.getenv('AUDIO_FILE')
+FFMPEG_PATH = os.getenv('FFMPEG_PATH')
+CHAT_CHANNEL_ID = os.getenv('CHAT_CHANNEL_ID')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-# Define the relative path for the audio file
-AUDIO_FILE = os.path.join(os.path.dirname(__file__), 'voices', 'chkon ja.mp3')
-
-# Set the path to the FFmpeg binary
-FFMPEG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'ffmpeg', 'ffmpeg'))
+# Define default values if environment variables are not set
+if AUDIO_FILE is None:
+    AUDIO_FILE = os.path.join(os.path.dirname(__file__), 'voices', 'chkon ja.mp3')
+if FFMPEG_PATH is None:
+    FFMPEG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'ffmpeg', 'ffmpeg'))
 
 # Debugging: print environment variables and file paths
 print(f"TOKEN: {TOKEN}")
@@ -40,14 +45,28 @@ print(f"STAY_CHANNEL_ID: {STAY_CHANNEL_ID}")
 print(f"MONITOR_CHANNEL_ID: {MONITOR_CHANNEL_ID}")
 print(f"AUDIO_FILE: {AUDIO_FILE}")
 print(f"FFMPEG_PATH: {FFMPEG_PATH}")
+print(f"CHAT_CHANNEL_ID: {CHAT_CHANNEL_ID}")
+print(f"GEMINI_API_KEY: {GEMINI_API_KEY}")
 
 if TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable not set")
+if CHAT_CHANNEL_ID is None:
+    raise ValueError("CHAT_CHANNEL_ID environment variable not set")
+if GEMINI_API_KEY is None:
+    raise ValueError("GEMINI_API_KEY environment variable not set")
 
-# Define intents and initialize the bot
+# Convert CHAT_CHANNEL_ID to integer
+CHAT_CHANNEL_ID = int(CHAT_CHANNEL_ID)
+
+# Initialize Discord bot with commands
 intents = discord.Intents.default()
 intents.voice_states = True
+intents.message_content = True # Enable message content intent for LLM feature
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Configure Gemini API
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash') # Or 'gemini-pro' if flash is not available
 
 async def ensure_connected():
     await bot.wait_until_ready()
@@ -116,6 +135,30 @@ async def on_voice_state_update(member, before, after):
 async def on_disconnect():
     print('Bot disconnected, attempting to reconnect...')
     bot.loop.create_task(ensure_connected())
+
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return  # Ignore messages sent by the bot itself
+
+    if message.channel.id == CHAT_CHANNEL_ID:
+        print(f"Received message in chat channel {CHAT_CHANNEL_ID} from {message.author}: {message.content}")
+        user_message = message.content
+
+        try:
+            response = model.generate_content(
+                [{"role": "user", "parts": [{"text": user_message}]}],  # Gemini API message format
+                stream=False
+            )
+            gemini_reply = response.text # Extract text from Gemini response
+            print(f"Gemini API Response: {gemini_reply}")
+            await message.channel.send(gemini_reply)
+
+        except Exception as e:
+            import traceback
+            error_message = traceback.format_exc() # Get full traceback
+            print(f"Error calling Gemini API:\n{error_message}")
+            await message.channel.send("Sorry, I encountered an error while processing your request. Please try again later.")
 
 # Keep the bot alive (for hosting platforms like Replit)
 keep_alive()
