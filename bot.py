@@ -66,16 +66,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
-
-# Define the tuned generation configuration - define it here, before on_message for clarity
-generation_config = {
-  "temperature": 0.75,
-  "top_p": 0.95,
-  "top_k": 40,
-  "max_output_tokens": 8192,
-  "response_mime_type": "text/plain",
-}
-
+model = genai.GenerativeModel('gemini-1.5-flash') # Or 'gemini-pro' if flash is not available
 
 async def ensure_connected():
     await bot.wait_until_ready()
@@ -153,14 +144,6 @@ async def on_message(message):
     if message.channel.id == CHAT_CHANNEL_ID:
         print(f"Received message in chat channel {CHAT_CHANNEL_ID} from {message.author}: {message.content}")
         user_message = message.content
-
-        # --- Gemini Tuned Model Configuration ---
-        # Use the generation_config defined outside on_message
-        model = genai.GenerativeModel(
-          tuned_model_name="tunedModels/flow-ai-wbv80utq157l",  # Your tuned model ID here
-          generation_config=generation_config,
-        )
-        # --- End of Gemini Tuned Model Configuration ---
 
         try:
             response = model.generate_content(
